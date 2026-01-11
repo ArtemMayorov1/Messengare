@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой Мессенджер</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f0f2f5; margin: 0; display: flex; height: 100vh; }
+        #auth-container, #chat-container { width: 100%; max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        #chat-container { display: none; flex-direction: column; height: 80vh; max-width: 600px; }
+        #messages { flex: 1; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; display: flex; flex-direction: column; }
+        .message { margin-bottom: 10px; padding: 8px 12px; border-radius: 15px; max-width: 70%; }
+        .my-msg { align-self: flex-end; background-color: #0084ff; color: white; }
+        .their-msg { align-self: flex-start; background-color: #e4e6eb; color: black; }
+        input { padding: 10px; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px; }
+        button { padding: 10px; background-color: #0084ff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0073e6; }
+    </style>
+</head>
+<body>
+
+<div id="auth-container">
+    <h2>Вход в мессенджер</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Пароль">
+    <button onclick="signUp()">Зарегистрироваться</button>
+    <button onclick="signIn()">Войти</button>
+</div>
+
+<div id="chat-container">
+    <div id="messages"></div>
+    <div style="display: flex;">
+        <input type="text" id="msg-input" placeholder="Введите сообщение..." style="flex: 1; margin-bottom: 0;">
+        <button onclick="sendMessage()">Отправить</button>
+    </div>
+    <button onclick="signOut()" style="margin-top: 10px; background-color: #ff4d4d;">Выйти</button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-firestore-compat.js"></script>
+
+<script>
+    // Замените эти данные на конфиг из вашего проекта Firebase
+    const firebaseConfig = {
+        apiKey: "ВАШ_API_KEY",
+        authDomain: "ВАШ_PROJECT_ID.firebaseapp.com",
+        projectId: "ВАШ_PROJECT_ID",
+        storageBucket: "ВАШ_PROJECT_ID.appspot.com",
+        messagingSenderId: "ВАШ_SENDER_ID",
+        appId: "ВАШ_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    function signUp() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        auth.createUserWithEmailAndPassword(email, password).catch(err => alert(err.message));
+    }
+
+    function signIn() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        auth.signInWithEmailAndPassword(email, password).catch(err => alert(err.message));
+    }
+
+    function signOut() {
+        auth.signOut();
+    }
+
+    auth.onAuthStateChanged(user => {
+        if (user) {
+            document.getElementById('auth-container').style.display = 'none';
+            document.getElementById('chat-container').style.display = 'flex';
+            loadMessages();
+        } else {
+            document.getElementById('auth-container').style.display = 'block';
+            document.getElementById('chat-container').style.display = 'none';
+        }
+    });
+
+    function sendMessage() {
+        const text = document.getElementById('msg-input').value;
+        if (text.trim() !== "") {
+            db.collection("messages").add({
+                text: text,
+                uid: auth.currentUser.uid,
+                email: auth.currentUser.email,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            document.getElementById('msg-input').value = '';
+        }
+    }
+
+    function loadMessages() {
+        db.collection("messages").orderBy("createdAt").onSnapshot(snapshot => {
+            const container = document.getElementById('messages');
+            container.innerHTML = '';
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const msgDiv = document.createElement('div');
+                msgDiv.classList.add('message');
+                msgDiv.classList.add(data.uid === auth.currentUser.uid ? 'my-msg' : 'their-msg');
+                msgDiv.innerText = `${data.email}: ${data.text}`;
+                container.appendChild(msgDiv);
+                container.scrollTop = container.scrollHeight;
+            });
+        });
+    }
+</script>
+</body>
+</html>
